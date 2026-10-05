@@ -9,7 +9,7 @@
  *     "default": "pikvm-2",
  *     "instances": {
  *       "pikvm-2": {
- *         "url": "https://pikvm-2.morante.com",
+ *         "url": "https://pikvm-2.example.com",
  *         "user": "admin",
  *         "password": "…",
  *         "verify_ssl": false
