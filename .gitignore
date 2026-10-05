@@ -1,0 +1,16 @@
+# Configuration with credentials
+config/instances.json
+config/settings.ini
+config/local.conf.php
+
+# Temporary files
+temp/
+*.log
+
+# Build output
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp

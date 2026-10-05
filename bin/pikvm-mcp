@@ -1,0 +1,90 @@
+#!/usr/bin/env php
+<?php
+/**
+ * PiKVM MCP Server — stdio Entry Point
+ *
+ * Multi-instance PiKVM control via the Model Context Protocol.
+ * Communicates over stdin/stdout using JSON-RPC 2.0.
+ *
+ * Usage: php bin/pikvm-mcp [--config=/path/to/instances.json] [--log=...]
+ *
+ * @package    PikvmMCP
+ * @author     Daniel Morante (assisted by Devin)
+ * @copyright  2026 The Daniel Morante Company, Inc.
+ * @license    BSD-2-Clause
+ */
+
+if (isset($argv[1]) && in_array($argv[1], ['--version', '-v', 'version', '-V'], true)) {
+	require_once dirname(__DIR__) . '/system/app.conf.php';
+	echo APPLICATION_NAME . ' ' . APPLICATION_VERSION . "\n";
+	exit(0);
+}
+
+require_once dirname(__DIR__) . '/system/bootstrap.inc.php';
+
+foreach (['openssl', 'curl', 'json'] as $ext) {
+	if (!extension_loaded($ext)) {
+		fwrite(STDERR, "[pikvm-mcp] ERROR: missing PHP extension: {$ext}\n");
+		exit(1);
+	}
+}
+
+use EnchiladaMCP\Logger;
+use EnchiladaMCP\McpServer;
+
+$configPath = getenv('PIKVM_MCP_CONFIG') ?: null;
+$logPath = getenv('PIKVM_MCP_LOG') ?: null;
+$logLevel = getenv('PIKVM_MCP_LOG_LEVEL') ?: 'debug';
+
+foreach ($argv ?? [] as $arg) {
+	if (str_starts_with($arg, '--config=')) {
+		$configPath = substr($arg, 9);
+	}
+	if (str_starts_with($arg, '--log=')) {
+		$logPath = substr($arg, 6);
+	}
+	if (str_starts_with($arg, '--log-level=')) {
+		$logLevel = substr($arg, 12);
+	}
+}
+
+if ($configPath === null) {
+	$default = APPLICATION_CONFDIR . 'instances.json';
+	$configPath = is_file($default) ? $default : null;
+}
+if ($configPath === null) {
+	fwrite(STDERR, "[pikvm-mcp] ERROR: no instances.json; provide --config=PATH or PIKVM_MCP_CONFIG\n");
+	exit(1);
+}
+
+$logger = null;
+if ($logPath) {
+	$levelMap = ['debug' => Logger::LEVEL_DEBUG, 'info' => Logger::LEVEL_INFO, 'error' => Logger::LEVEL_ERROR];
+	$level = $levelMap[strtolower($logLevel)] ?? Logger::LEVEL_DEBUG;
+	$logger = new Logger($logPath, $level, false, 'pikvm-mcp');
+}
+
+$manager = \Pikvm\InstanceManager::fromFile($configPath);
+
+$server = new McpServer(APPLICATION_SLUG, APPLICATION_VERSION);
+$server->setInstructions(
+	'PiKVM hardware console control: screenshots (JPEG images), keyboard, mouse, ATX power, ' .
+	'streamer/HID state inspection. Key tools are given friendly names (enter, ctrl, f1) or literals ' .
+	'— they are mapped to kvmd HID codes server-side. Coordinates are pixels in the screen snapshot. ' .
+	'Every HID/ATX operation is validated against kvmd\'s {ok: bool} envelope; a failure raises.'
+);
+
+// Register every tool class in tools/ via the canonical Enchilada loader.
+enchilada_mcp_register_tools($server, $logger ? static function (string $class) use ($logger): void {
+	$logger->debug('registered tool class ' . $class);
+} : null, $manager);
+if ($logger) {
+	$logger->info('pikvm-mcp started (stdio transport)');
+}
+
+$transport = new \Enchilada\Tortilla\StdioTransport($server->handleRequest(...), $server->tick(...));
+if ($logger) {
+	$transport->setLogger($logger);
+}
+$server->setNotifier($transport->sendNotification(...));
+$transport->run();

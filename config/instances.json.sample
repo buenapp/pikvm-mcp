@@ -1,0 +1,11 @@
+{
+  "default": "pikvm-2",
+  "instances": {
+    "pikvm-2": {
+      "url": "https://pikvm-2.morante.com",
+      "user": "admin",
+      "password": "REPLACE_ME",
+      "verify_ssl": false
+    }
+  }
+}
