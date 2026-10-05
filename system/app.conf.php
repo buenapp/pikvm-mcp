@@ -11,7 +11,7 @@
 define('APPLICATION_NAME', 'PiKVM MCP Server');
 define('APPLICATION_SLUG', 'pikvm-mcp');
 define('APPLICATION_WEBSITE', 'https://pacyworld.dev/buenapp/pikvm-mcp');
-define('APPLICATION_VERSION', 'v0.1.0-dev');
+define('APPLICATION_VERSION', 'v0.1.0');
 define('APPLICATION_ROOT', dirname(__DIR__) . DIRECTORY_SEPARATOR);
 define('APPLICATION_CONFDIR', (getenv('PIKVM_MCP_CONF_DIR') ?: APPLICATION_ROOT . 'config' . DIRECTORY_SEPARATOR));
 define('APPLICATION_DEBUG', getenv('ENCHILADA_DEBUG_ENABLE'));

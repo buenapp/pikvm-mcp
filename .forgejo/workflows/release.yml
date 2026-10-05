@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: FreeBSD
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build PHAR
+        run: php -d phar.readonly=0 bin/build-phar.php
+
+      - name: Smoke test PHAR
+        run: |
+          echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}
+          {"jsonrpc":"2.0","method":"notifications/initialized"}
+          {"jsonrpc":"2.0","id":2,"method":"tools/list"}' | timeout 15 php pikvm-mcp.phar --version || true
+
+      - name: Create release
+        run: |
+          VERSION="${{ github.ref_name }}"
+          BODY="Release ${VERSION} of PiKVM MCP Server.
+
+          ## Install
+          \`\`\`sh
+          curl -LO ${{ github.server_url }}/${{ github.repository }}/releases/download/${VERSION}/pikvm-mcp.phar
+          chmod +x pikvm-mcp.phar
+          \`\`\`"
+
+          RELEASE_ID=$(curl -s -X POST \
+            -H "Authorization: token ${FORGE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"tag_name\":\"${VERSION}\",\"name\":\"${VERSION}\",\"body\":$(echo "$BODY" | jq -Rs .)}" \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/releases" | jq -r '.id')
+
+          curl -s -X POST \
+            -H "Authorization: token ${FORGE_TOKEN}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @pikvm-mcp.phar \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/releases/${RELEASE_ID}/assets?name=pikvm-mcp.phar"
+
+          echo "Release ${VERSION} created with PHAR attachment"
+        env:
+          FORGE_TOKEN: ${{ secrets.FORGE_TOKEN }}
